@@ -1,0 +1,111 @@
+---
+title: "Challenge 8"
+author: "Zuhayr Baqar"
+date: "5/30/2021"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(readxl)
+library(kableExtra)
+library(extrafont)
+
+```
+
+```{r}
+US_schools <- read_excel("US_schools_data.xlsx")
+```
+
+
+
+
+```{r}
+#Split the year from the state
+year_state<- US_schools$PRIMARY_KEY
+x <- str_replace_all(year_state, "_", " ")
+x <- str_split_fixed(x, " ", n = 2)
+
+split_year_state <- data.frame(x)
+split_year_state<- rename(split_year_state, YEAR = X1, STATE = X2)
+  
+#select columns and merge split_year_state columns
+schools_clean <- US_schools %>%
+  cbind(split_year_state) %>%
+  select(YEAR, STATE,TOTAL_EXPENDITURE, INSTRUCTION_EXPENDITURE, SUPPORT_SERVICES_EXPENDITURE, OTHER_EXPENDITURE, CAPITAL_OUTLAY_EXPENDITURE, ends_with(c("READING", "MATHEMATICS")) )
+  
+```
+
+
+
+
+```{r}
+schools_clean <- schools_clean %>%
+  pivot_longer(8:47, names_to = c("GRADE", "RACE", "SEX", "TEST"), names_sep ="_", values_to = "TEST_SCORES")
+```
+
+
+
+
+
+```{r, message = FALSE, warning = FALSE, include = FALSE}
+# creating a data frame called regions which contains each State included in the min_wage dataset and its corresponding region 
+regions <- 
+  data.frame(
+    STATE = toupper(c("MAINE", "MASSACHUSETTS", "Rhode Island", "Connecticut", "New Hampshire", "Vermont", "New York", "Pennsylvania", "New Jersey", "Delaware", "Maryland", "West Virginia", "Virginia", "Kentucky", "Tennessee", "North Carolina", "South Carolina", "Georgia", "Alabama", "Mississippi", "Arkansas", "Louisiana", "Florida", "Ohio", "Indiana", "Michigan", "Illinois", "Missouri", "Wisconsin", "Minnesota", "Iowa", "Kansas", "Nebraska", "South Dakota", "North Dakota", "Texas", "Oklahoma", "New Mexico", "Arizona", "Colorado", "Wyoming", "Montana", "Idaho", "Washington", "Oregon", "Utah", "Nevada", "California", "Alaska", "Hawaii", "District of Columbia", "Federal (FLSA)", "U.S. Virgin Islands", "Guam", "Puerto Rico")), 
+    Region = c("Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Northeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Southeast", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Midwest", "Southwest", "Southwest", "Southwest", "Southwest", "West", "West", "West", "West", "West", "West", "West", "West", "West", "West", "West", "Southeast", "Other", "Other", "Other", "Other"))
+```
+
+```{r}
+schools_clean <- 
+  schools_clean %>%
+  left_join(regions, by = "STATE") %>%
+  filter(STATE != "DODEA", STATE != "NATIONAL")
+```
+
+
+
+
+```{r}
+
+sex_fct <- schools_clean$SEX
+
+sex_fct <- fct_recode(sex_fct, All = "A")
+
+schools_clean <- schools_clean %>% mutate(SEX = sex_fct)
+
+```
+
+```{r}
+schools_clean <- schools_clean %>% mutate(GRADE = str_extract(GRADE, "[1-9]"))
+```
+
+# Data Visualization
+
+
+The distribution of mathematics and reading test scores by gender group.
+
+```{r, echo=TRUE, message=FALSE}
+schools_clean %>%
+  ggplot(aes(x= SEX, y = TEST_SCORES, color = SEX)) + 
+  geom_boxplot() + labs(
+    y= "Test Score", title = "Distribution of Test Scores by Sex"
+    ) + 
+  geom_jitter(alpha = 0.2) +
+  scale_colour_manual(values = c("Dark Green", "Pink", "Light Blue")) + 
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.title.x = element_blank(),
+    legend.position = "none"
+    ) +
+  annotate("text", x = 3, y = 177, label = "Male") + 
+  annotate("text", x = 2, y = 180, label = "Female") + 
+  annotate("text", x = 1, y = 170, label = "All") + facet_wrap(~TEST)
+```
