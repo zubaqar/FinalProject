@@ -20,6 +20,7 @@ library(tidyverse)
 library(readxl)
 library(kableExtra)
 library(extrafont)
+library(broom)
 
 ```
 
@@ -120,13 +121,11 @@ Create at least three different visualizations exploring the following:
 The relationship between instructional expenditures and testing scores, and how this differs by regions
 
 ```{r}
-schools_sample <- schools_clean %>%
-  sample_n(30000, na.rm = F) %>%
-  filter(RACE != "All", RACE != "Two or More Races")
 
-plot1 <- schools_sample %>% 
+
+plot1 <- schools_clean %>% 
   ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES)) + 
-  geom_jitter(cex = .8, aes(color = RACE)) + 
+  geom_jitter(cex = .8, aes(color = RACE), alpha = 0.5) + 
   scale_fill_brewer() +
   geom_smooth(color = "black",fill = "darkgrey", method = "lm") +
   facet_wrap(~Region, nrow =  3)+
@@ -179,9 +178,7 @@ expend_reading <- schools_clean %>% filter(TEST == "READING") %>% lm(TEST_SCORES
 
 ## Model Comparison
 For which test does instructional expenditures account for a larger proportion of the variability? How substantial is the difference?
-```{r}
-schools_clean %>% ggplot(aes(INSTRUCTION_EXPENDITURE, TEST_SCORES, color = "Red")) + geom_point() + geom_smooth(method = "lm") + facet_wrap(~TEST) + theme(legend.position = "none")
-```
+
 
 ### Relationship between instructional expenditures and *mathematics* test scores 
 ```{r MathReg}
@@ -194,10 +191,21 @@ summary(expend_math)
 summary(expend_reading)
 ```
 
+From the two models that we created, the math model resulted in instruction expenditure accounting for 0.426% of the variability in test scores while the reading model resulted in instruction expenditure accounting for 0.036% of the variability in test scores 
 
 ## Multiple Linear Regression
 ### Both Tests
 Rather than having separate models, one for reading and one for mathematics, we can instead fit one regression model that includes test as an explanatory variable.
+
+```{r MLR}
+schools_clean  %>% 
+  lm(
+    TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST, data = .
+    ) %>% 
+  summary()
+```
+
+
 
 Does this model account for a larger proportion of variability in test scores?
 
@@ -206,13 +214,111 @@ Alright, now that we’ve got a “good” starting model, we can start to add v
 
 Include year as a second explanatory variable in your model. How much additional variability in test scores were you able to explain by including year?
 
+```{r}
+schools_clean  %>% mutate(YEAR = as.numeric(YEAR)) %>% 
+  lm(TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST + YEAR  , data = .) %>%
+  summary()
+```
 ## Adjusting for Complexity
 There is a trade off between model “complexity” and an increase in a model’s R2. Unfortunately, even if a variable doesn’t add much to the model, the R2 for that model will still increase. So, we need a different measure that can account for whether the variable(s) explain components of the variability in test scores that weren’t accounted for by other variables.
 
 This is where adjusted R2 comes in. By “adjusting” the R2, we are essentially making a penalty for whether the extra variable added something “new” to the model.
 
 Include additional variables in your regression and see how much variability in test scores your model can account for. Use adjusted R2 to decide on what final model your group believes is the “best.”
+```{r}
+final_model <- schools_clean  %>% 
+  mutate(YEAR = as.numeric(YEAR)) %>% 
+  lm(
+    TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST + YEAR + GRADE + Region , data = .
+    )
+summary(final_model)
+```
 
 With your final model, make a visualization that explores the relationships accounted for in your model.
 
+```{r}
+# creating a dataset that removes na values to match the number of observations with the regressions.
+schools_model <- schools_clean %>% 
+  filter(!is.na(TEST_SCORES)) %>% 
+  filter(!is.na(INSTRUCTION_EXPENDITURE)) %>% 
+  filter(!is.na(YEAR))
+```
+
+With your chosen model, generate predictions using the predict() function. Then, add random errors to the predictions, using the residual standard error estimated from the linear regression model (acquired with sigma()).
+
+```{r}
+# saving the predicted values and the standard deviation
+model_pred <- predict(final_model)
+model_sig <- sigma(final_model)
+```
+
+Tip: Measure the R-squared between expected vs observed values, SSE, and RMSE
+```{r}
+is.vector(model_pred)
+```
+
+
+```{r}
+noise <- function(x, mean = 0, sd){
+  n <- length(x)
+  new_data <- x + rnorm(n, mean, sd)
+  return(new_data)
+}
+```
+
+```{r}
+schools_model <- schools_model %>% 
+  mutate(
+    predicted = noise(model_pred, sd = model_sig)
+                   )
+```
+
+Now, compare these simulated observations to the observed data. Generate the same plot of the relationships modeled by the linear regression, for the simulated data (that you made at the end of Part One).
+Plot the visualization of the observed data and the simulated data side-by-side. Discuss how the simulated data are similar and / or different to the observed data.
+
+```{r}
+
+schools_model %>% 
+  ggplot(aes(INSTRUCTION_EXPENDITURE, TEST_SCORES, color = TEST, linetype = GRADE)) + 
+  geom_jitter(alpha = 0.4) +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~YEAR) + 
+  labs(x = "Instruction Expenditure", y = "Test Scores", title = "Regression with Observed Values", color = "Test", linetype = "Grade" )
+
+schools_model %>% 
+  ggplot(aes(INSTRUCTION_EXPENDITURE, predicted, color = TEST, linetype = GRADE)) + 
+  geom_jitter(alpha = 0.4) +
+  geom_smooth(method = "lm") + 
+  facet_wrap(~YEAR) + 
+  labs(x = "Instruction Expenditure", y = "Predicted Test Scores", title = "Regression With Predicted Values", color = "Test", linetype = "Grade" )
+```
+
+
+```{r}
+nsims <- 1000
+
+sims <- map_dfc(1:nsims,
+                ~tibble(sim = noise(model_pred, sd = model_sig))) 
+sims <- schools_model %>% 
+  select(TEST_SCORES) %>% 
+  bind_cols(sims)
+```
+```{r}
+obs_vs_sim <- function(df){
+  lm(schools_model$TEST_SCORES ~ x)
+}
+
+sim_r_sq <- sims %>% 
+  map( ~lm(TEST_SCORES ~ .x, data = sims)) %>% 
+  map(glance) %>% 
+  map_dbl(~.$r.squared) 
+
+```
+```{r}
+is.list(sim_r_sq)
+```
+
+```{r}
+sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_density() + xlim(0.7, 0.73)
+```
 
