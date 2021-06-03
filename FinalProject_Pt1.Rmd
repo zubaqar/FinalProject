@@ -28,6 +28,7 @@ library(gganimate)
 library(plotly)
 library(gifski)
 library(animation)
+
 ```
 
 ```{r}
@@ -308,19 +309,21 @@ Plot the visualization of the observed data and the simulated data side-by-side.
 
 ```{r}
 
-schools_model %>% 
+obs_plot <- schools_model %>% 
   ggplot(aes(INSTRUCTION_EXPENDITURE, TEST_SCORES, color = TEST, linetype = GRADE)) + 
   geom_jitter(alpha = 0.4) +
   geom_smooth(method = "lm") + 
   facet_wrap(~YEAR) + 
-  labs(x = "Instruction Expenditure", y = "Test Scores", title = "Regression with Observed Values", color = "Test", linetype = "Grade" )
+  labs(x = "Instruction Expenditure", y = "Observed Test Scores", title = "Regression with Observed Values", color = "Test", linetype = "Grade" )
 
-schools_model %>% 
+pred_plot <- schools_model %>% 
   ggplot(aes(INSTRUCTION_EXPENDITURE, predicted, color = TEST, linetype = GRADE)) + 
   geom_jitter(alpha = 0.4) +
   geom_smooth(method = "lm") + 
   facet_wrap(~YEAR) + 
   labs(x = "Instruction Expenditure", y = "Predicted Test Scores", title = "Regression With Predicted Values", color = "Test", linetype = "Grade" )
+
+gridExtra::grid.arrange(pred_plot, obs_plot, nrow = 1)
 ```
 
 
