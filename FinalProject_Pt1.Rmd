@@ -12,7 +12,7 @@ output: html_document
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 ```{r, message = FALSE, warning = FALSE}
@@ -22,6 +22,12 @@ library(kableExtra)
 library(extrafont)
 library(broom)
 
+library(gapminder)
+library(transformr)
+library(gganimate)
+library(plotly)
+library(gifski)
+library(animation)
 ```
 
 ```{r}
@@ -137,6 +143,30 @@ plot1 <- schools_clean %>%
 plot1 + scale_colour_brewer(palette = "Set2") 
 ```
 
+
+
+```{r}
+plot1 <- schools_clean %>% 
+  filter(!is.na(TEST_SCORES)) %>%
+  group_by(YEAR) %>%
+  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES)) + 
+  geom_jitter(cex = .8, aes(color = Region), show.legend = FALSE) + 
+  scale_fill_brewer() +
+  facet_wrap(~Region, nrow =  3)+
+  labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
+  labs(title = 'Year: {frame_time}', x = 'Instruction Expenditure', y = 'Test Scores') +
+  transition_time(as.integer(YEAR)) +
+  ease_aes('linear')
+
+
+files <- animate(plot1)
+
+```
+
+```{r}
+files <- as.vector(files)
+gifski(files, gif_file = "animation.gif", width = 800, height = 600, delay = 0.5, loop = TRUE, progress = TRUE)
+```
 
 The distribution of mathematics and reading test scores
 
@@ -311,14 +341,15 @@ obs_vs_sim <- function(df){
 sim_r_sq <- sims %>% 
   map( ~lm(TEST_SCORES ~ .x, data = sims)) %>% 
   map(glance) %>% 
-  map_dbl(~.$r.squared) 
+  map_dbl(~.$r.squared)
 
-```
-```{r}
-is.list(sim_r_sq)
 ```
 
 ```{r}
-sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_density() + xlim(0.7, 0.73)
+sim_r_sq <- as.data.frame(sim_r_sq)
+```
+
+```{r}
+sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_histogram(color = "green", fill = "dark blue") + xlim(0.7, 0.73)
 ```
 
