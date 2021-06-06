@@ -21,13 +21,13 @@ library(readxl)
 library(kableExtra)
 library(extrafont)
 library(broom)
-
+library(extrafont)
 library(gapminder)
 library(transformr)
 library(gganimate)
 library(plotly)
 library(gifski)
-library(animation)
+
 
 ```
 
@@ -122,10 +122,17 @@ schools_clean$RACE[schools_clean$RACE == "TR"] = "Two or More Races"
 schools_clean$RACE[schools_clean$RACE == "A"] = "All"
 ```
 
+```{r}
+# creating a dataset that removes na values to match the number of observations with the regressions.
+schools_model <- schools_clean %>% 
+  filter(!is.na(TEST_SCORES)) %>% 
+  filter(!is.na(INSTRUCTION_EXPENDITURE)) %>% 
+  filter(!is.na(YEAR))
+```
 # Data Visualization
 Create at least three different visualizations exploring the following:
 
-The relationship between instructional expenditures and testing scores, and how this differs by regions
+## Figure 1
 
 ```{r}
 
@@ -139,37 +146,53 @@ plot1 <- schools_clean %>%
   labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
   ggtitle("How School Expenditures Impacts Test Scores") +
   xlab("Instruction Expenditure") + ylab("Test Scores") +
-  theme(text=element_text(size=10, family="Times"), legend.position = "right") 
+  theme(text=element_text(size=10, family="serif"), legend.position = "right") 
 
 plot1 + scale_colour_brewer(palette = "Set2") 
 ```
 
+This above plot shows the relationship between instructional expenditures and testing scores, how this differs by region, in addition to taking into account both sex and race. One aspect of the data set that the above plot reveals right away is a “hole” in the data collection process, more specifically when taking into account race and sex. When the sex is specified (male or female), we no longer have data about the corresponding race, we only have the grouped “All” race. And likewise, when race is specified, we no longer know the corresponding sex, we only have the grouped “All” sex. This is why the first line of plots plotting the “All” variable of sex is the only one that shows the different colors of Race. To further analyze this plot, we see that the relationship between instructional expenditures and testing scores differs by regions, but does not differ greatly by sex. We know this because the regression line between the different regions are very different, whereas the regression line for the same region and different sex look very similar. We can see that the Midwest and Southeast have the lowest amount of instruction expenditures, because there are no data points that go above the 20 million mark. In addition, we can see that the Midwest, Northeast, and West have fairly flat and horizontal regression lines, meaning there is little to no relationship between instructional expenditures and testing scores. However, we see a positive relationship in the Southeast; as instruction expenditure increases, so do testing scores. 
 
+## Figure 2
+
+```{r, message = FALSE, warning = FALSE}
+cdPalette <- c("#F1c2bc", "#Ffd5b9", "#Ebffb9", "#B9ffd6", "#B9fff8", "#B9bcff", "#Ffb9fe", "#C6bcbc")
+loadfonts(device = "win")
+schools_clean %>%
+  ggplot(aes(x = TEST_SCORES, fill = RACE)) + 
+  geom_boxplot() + 
+  facet_wrap(SEX~TEST, nrow = 3) + 
+  theme(panel.spacing = unit(0.1, "lines")) + 
+  theme(panel.grid.minor = element_line(colour = "white", size = 1)) +
+  labs(x = "Test Scores", title = "Distribution of Mathematics and Reading Test Scores by Sex and Race", y = "") +
+  # annotate("text", x = 150, y = -0.33, label = "All", color = "black", size = 3) +
+  scale_fill_manual(values = cdPalette) +
+  theme(text = element_text(size = 12,  family = "serif")) +
+  theme(axis.ticks = element_blank(), axis.text.y = element_blank())
+```
+
+This above plot shows the distribution of mathematics and reading test scores, in addition to taking into account both sex and race. This plot shows the similar “hole” in the data as the above plot, where Race is only specifically defined when Sex is not speicially defined, and vice versa. The distribution of mathematics and reading test scores displays that the mathematics scores tend to be slightly higher than the reading test scores throughout the different groups and facets. Additionally, it appears that females tend to score slightly higher on the reading test whereas males tend to score slightly higher on the mathematics test. To take a look at race, it appears that people who identify as Asian tend to have the highest reading and mathematics test scores. Next, it appears that people who identify as “White” have the second highest test scores. After ranking based on the test scores, comes people who identify as “Two or More Races”, then “Hispanic / Latino”, and after “Hawaiian Native / Pacific Islander”, “Black or African American”, and “American Indian or Alaska Native” all score very similarly. 
+
+## Figure 3
 
 ```{r}
-plot1 <- schools_clean %>% 
+Expend_Test <- schools_model %>% 
   filter(!is.na(TEST_SCORES)) %>%
   group_by(YEAR) %>%
-  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES)) + 
-  geom_jitter(cex = .8, aes(color = Region), show.legend = FALSE) + 
-  scale_fill_brewer() +
+  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES, color = "red", linetype = GRADE)) + 
+  geom_jitter(cex = .8, show.legend = FALSE) + 
   facet_wrap(~Region, nrow =  3)+
-  labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
+  labs(x = "Instruction Expenditure ($)", y = "Test Scores", title = "How Instruction Expenditures Impacts Test Scores Pver Time") +
   labs(title = 'Year: {frame_time}', x = 'Instruction Expenditure', y = 'Test Scores') +
   transition_time(as.integer(YEAR)) +
-  ease_aes('linear')
-
-
-files <- animate(plot1)
-
+  ease_aes('linear') + theme(axis.text.x = element_text(size = 7, angle = 90)) + 
+  scale_x_continuous(labels = scales::comma)
+animate(Expend_Test)
 ```
 
-```{r}
-files <- as.vector(files)
-gifski(files, gif_file = "animation.gif", width = 800, height = 600, delay = 0.5, loop = TRUE, progress = TRUE)
-```
+Figure 3 shows how the relationship between instructional expenditures and test scores change over time in five regions within the United States. All 5 regions have lower instruction expenditures and test scores throughout the 90s. In the 2000s a gap between high and low instruction expenditures developed, especially in the West, Southwest and Northeast, while the Midwest and Southeast maintained relatively low instruction expenditures. Although all regions demonstrate an increase in the distribution of test scores over time, only the Southeast and Southwest demonstrated a slight positive relationship between school expenditures and test scores. 
 
-The distribution of mathematics and reading test scores
+## Figure 4
 
 ```{r}
 schools_clean %>%
@@ -191,14 +214,15 @@ schools_clean %>%
 
 ```
 
-
+Figure 4 shows how the distribution of test scores changes over time by region. This visualization also shows how more data was collected overtime. Starting around 2005 there are a lot more data points for each region, which may explain the increase in variation. Overall the distribution does not change the average test score too much, but there does appear to be a gradual increase in test scores over time, with the Northeast leading the way. 
 
 How school instructional expenditures and test scores have changed over time, and how this differs by region
 
 Each of these visualizations should also investigate how these relationships differ based on student race and sex.
 
 # Linear Regression
-Fit two simple linear regression models, (1) investigating the relationship between instructional expenditures and mathematics test scores, and (2) investigating the relationship between instructional expenditures and reading test scores.
+
+To begin with, we created two simple models  to analyze if there is any difference between the mathematics and reading tests when it came to predicting test scores from instructions expenditure. To measure the accuracy of the models, we decided to use the R-squared statistic, which measures the variability accounted for in the response variable (test scores) due to the explanatory variable (instructional expenditure).
 ```{r LinReg}
 expend_math <- schools_clean %>% filter(TEST == "MATHEMATICS") %>% lm(TEST_SCORES ~ INSTRUCTION_EXPENDITURE, data = .)
 
@@ -207,6 +231,7 @@ expend_reading <- schools_clean %>% filter(TEST == "READING") %>% lm(TEST_SCORES
 
 ```
 
+From the two models that we created, the math model resulted in instruction expenditure accounting for 0.426% of the variability in test scores while the reading model resulted in instruction expenditure accounting for 0.036% of the variability in test scores. This means that the model is slightly more accurate in predicting math test scores given instructional expenditure. That being said, the variability accounted for is still less than 1%. In order to generate a more accurate model, we checked the R-squared as we regressed on more explanatory variables. 
 ## Model Comparison
 For which test does instructional expenditures account for a larger proportion of the variability? How substantial is the difference?
 
@@ -222,11 +247,12 @@ summary(expend_math)
 summary(expend_reading)
 ```
 
-From the two models that we created, the math model resulted in instruction expenditure accounting for 0.426% of the variability in test scores while the reading model resulted in instruction expenditure accounting for 0.036% of the variability in test scores 
+
 
 ## Multiple Linear Regression
 ### Both Tests
-Rather than having separate models, one for reading and one for mathematics, we can instead fit one regression model that includes test as an explanatory variable.
+
+To account for the test, instead of creating two separate models, we incorporated the **test** variable as a categorical predictor in the equation. We also believed that the **year** of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
 
 ```{r MLR}
 schools_clean  %>% 
@@ -236,14 +262,7 @@ schools_clean  %>%
   summary()
 ```
 
-
-
-Does this model account for a larger proportion of variability in test scores?
-
-### Additional Variables
-Alright, now that we’ve got a “good” starting model, we can start to add variables. It is clear that the relationship between instructional expenditures and test scores changes over time. So, let’s make a time-series model to account for this.
-
-Include year as a second explanatory variable in your model. How much additional variability in test scores were you able to explain by including year?
+To account for the test, instead of creating two separate models, we incorporated the **test** variable as a categorical predictor in the equation. We also believed that the **year** of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
 
 ```{r}
 schools_clean  %>% mutate(YEAR = as.numeric(YEAR)) %>% 
@@ -256,6 +275,8 @@ There is a trade off between model “complexity” and an increase in a model�
 This is where adjusted R2 comes in. By “adjusting” the R2, we are essentially making a penalty for whether the extra variable added something “new” to the model.
 
 Include additional variables in your regression and see how much variability in test scores your model can account for. Use adjusted R2 to decide on what final model your group believes is the “best.”
+
+Again, we decided to add some seemingly relavent variables to our model to see if it improved our R-squared. One of the variables was **GRADE** because we had a hypothesis that the grade in which the student in presumably affects their tests score. More specifically, we thought that a higher grade would result in a higher test score, since the student would have more knowledge and therefore more capable of achieving a better score. The other variable we accounted for is **Region**. Different regions most likely spend different amounts of money on education, so we wanted to have that reflected in our model. Also by including regions, we could potentially see which regions were scoring lower or higher on the tests, and see if there was any correlation between the region and the test score. After adding these two variables (**GRADE** and **Region**), our R-squared was now 0.8464, meaning that almost 85% of the variability in the observed test scores was being accounted for by the explanatory variables we included in our model. This is much better, and now some deductions could be made.
 ```{r}
 final_model <- schools_clean  %>% 
   mutate(YEAR = as.numeric(YEAR)) %>% 
@@ -267,12 +288,25 @@ summary(final_model)
 
 With your final model, make a visualization that explores the relationships accounted for in your model.
 
+
+
 ```{r}
-# creating a dataset that removes na values to match the number of observations with the regressions.
-schools_model <- schools_clean %>% 
-  filter(!is.na(TEST_SCORES)) %>% 
-  filter(!is.na(INSTRUCTION_EXPENDITURE)) %>% 
-  filter(!is.na(YEAR))
+plot1 <- schools_model %>% 
+  filter(!is.na(TEST_SCORES)) %>%
+  group_by(YEAR) %>%
+  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES, color = TEST, linetype = GRADE)) + 
+  geom_smooth(method = "lm") +
+  geom_jitter(cex = .8, show.legend = FALSE) + 
+  scale_fill_brewer() +
+  facet_wrap(~Region, nrow =  3)+
+  labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
+  labs(title = 'Year: {frame_time}', x = 'Instruction Expenditure', y = 'Test Scores') +
+  transition_time(as.integer(YEAR)) +
+  ease_aes('linear') + theme(axis.text.x = element_text(size = 7, angle = 90)) + 
+  scale_x_continuous(labels = scales::comma)
+
+
+animate(plot1 + scale_colour_brewer(palette = "Set2"))
 ```
 
 With your chosen model, generate predictions using the predict() function. Then, add random errors to the predictions, using the residual standard error estimated from the linear regression model (acquired with sigma()).
@@ -284,9 +318,7 @@ model_sig <- sigma(final_model)
 ```
 
 Tip: Measure the R-squared between expected vs observed values, SSE, and RMSE
-```{r}
-is.vector(model_pred)
-```
+
 
 
 ```{r}
@@ -308,22 +340,44 @@ Now, compare these simulated observations to the observed data. Generate the sam
 Plot the visualization of the observed data and the simulated data side-by-side. Discuss how the simulated data are similar and / or different to the observed data.
 
 ```{r}
+obs_plot  <- schools_model %>% 
+  filter(!is.na(TEST_SCORES)) %>%
+  group_by(YEAR) %>%
+  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = TEST_SCORES, color = TEST, linetype = GRADE)) + 
+  geom_smooth(method = "lm") +
+  geom_jitter(cex = .8, show.legend = FALSE) + 
+  scale_fill_brewer() +
+  facet_wrap(~Region, nrow =  3)+
+  labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
+  labs(title = 'Year: {frame_time}', x = 'Instruction Expenditure', y = 'Observed Test Scores') +
+  transition_time(as.integer(YEAR)) +
+  ease_aes('linear') + theme(axis.text.x = element_text(size = 7, angle = 90)) + 
+  scale_x_continuous(labels = scales::comma)
 
-obs_plot <- schools_model %>% 
-  ggplot(aes(INSTRUCTION_EXPENDITURE, TEST_SCORES, color = TEST, linetype = GRADE)) + 
-  geom_jitter(alpha = 0.4) +
-  geom_smooth(method = "lm") + 
-  facet_wrap(~YEAR) + 
-  labs(x = "Instruction Expenditure", y = "Observed Test Scores", title = "Regression with Observed Values", color = "Test", linetype = "Grade" )
 
-pred_plot <- schools_model %>% 
-  ggplot(aes(INSTRUCTION_EXPENDITURE, predicted, color = TEST, linetype = GRADE)) + 
-  geom_jitter(alpha = 0.4) +
-  geom_smooth(method = "lm") + 
-  facet_wrap(~YEAR) + 
-  labs(x = "Instruction Expenditure", y = "Predicted Test Scores", title = "Regression With Predicted Values", color = "Test", linetype = "Grade" )
+animate(obs_plot + scale_colour_brewer(palette = "Set2"))
+```
 
-gridExtra::grid.arrange(pred_plot, obs_plot, nrow = 1)
+
+```{r}
+pred_plot  <- schools_model %>% 
+  filter(!is.na(TEST_SCORES)) %>%
+  group_by(YEAR) %>%
+  ggplot(aes(x = INSTRUCTION_EXPENDITURE, y = predicted, color = TEST, linetype = GRADE)) + 
+  geom_smooth(method = "lm") +
+  geom_jitter(cex = .8, show.legend = FALSE) + 
+  scale_fill_brewer() +
+  facet_wrap(~Region, nrow =  3)+
+  labs(x = "Instruction Expenditure", y = "Test Scores", title = "How School Expenditures Impacts Test Scores") +
+  labs(title = 'Year: {frame_time}', x = 'Instruction Expenditure', y = 'Predicted Test Scores') +
+  transition_time(as.integer(YEAR)) +
+  ease_aes('linear') + theme(axis.text.x = element_text(size = 7, angle = 90)) + 
+  scale_x_continuous(labels = scales::comma)
+
+
+animate(pred_plot + scale_colour_brewer(palette = "Set2"))
+
+
 ```
 
 
@@ -353,6 +407,6 @@ sim_r_sq <- as.data.frame(sim_r_sq)
 ```
 
 ```{r}
-sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_histogram(color = "green", fill = "dark blue") + xlim(0.7, 0.73)
+sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_histogram(color = "green", fill = "dark blue") + xlim(0.7, 0.73) + labs(x = "Simulated R-squared", y = "Count")
 ```
 
