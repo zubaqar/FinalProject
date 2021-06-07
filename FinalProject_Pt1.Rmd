@@ -12,7 +12,7 @@ output: html_document
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
 ```{r, message = FALSE, warning = FALSE}
@@ -31,18 +31,17 @@ library(gifski)
 
 ```
 
+# Introduction
+Growing up in the United States, the mindset of the United States being the best country in the world was one I would often happen upon. But as the years go by, this question of the best country becomes deeper and deeper. One aspect of understanding this question of “best country” is knowing what variables are considered. Some are quality of life, healthcare, economic and political stability, but in addition to these, one of the most important is a country’s education system. Today, we will take a deeper dive into the United States’ education system. The data we will be using was pulled from the Urban Institute’s API. The dataset brings together multiple facets of U.S. education data, including data related to a student’s race, sex, expenditures, and test scores throughout the years.
 ```{r}
 US_schools <- read_excel("US_schools_data.xlsx")
 ```
 
+# Data Cleaning
 
-## Data Narrowing
-For this analysis, we are interested in the school expenditure variables (TOTAL_EXPENDITURE, INSTRUCTION_EXPENDITURE, SUPPORT_SERVICES_EXPENDITURE, OTHER_EXPENDITURE, CAPITAL_OUTLAY_EXPENDITURE), and the testing variables (anything ending in READING or MATHEMATICS). Downsize the dataset to only include these variables, as well as the key column identifying the state / year.
-
-## Separating Key Column
-The PRIMARY_KEY column contains information for both the state and the year of the observation. Separate this columns into two columns.
-
-Hint: The word() function is quite helpful here!
+Before we get into analyzing the data, let’s quickly discuss the steps we took into cleaning our dataset. Since this dataset is a collection of multiple datasets that have been merged together, we had our work cut out for us in regards to data cleaning. 
+The first step we took was narrowing our data, primarily focusing on the instruction (education) expenditure variables, testing variables (whether it is reading or math test, and the average score), the grade of the students (4 or 8 in this dataset),  state, and year. 
+Next, since the data was given to us separated by states, we wanted to focus more on regions. We decided to split up our regions geographically; the geographic regions we split our states into include: West, Midwest, Southwest, Southeast, and Northeast. We believed these regions would have differing relationships between instruction expenditures and average test scores because we hypothesized that the states located within the regions might have some economical and geographical differences. We thought that if we grouped these similar regions together, when we compare the five regions amongst each other, we would see a difference in relationships between school expenditures and student test scores.
 
 ```{r}
 #Split the year from the state
@@ -61,10 +60,7 @@ schools_clean <- US_schools %>%
 ```
 
 
-## Pivoting Longer
-The grade (04, 08), race (AM, AS, BL, HI, HP, TR, WH), sex (A, F, M), and test (READING, MATHEMATICS) are spread across the columns. We need to pivot these variables to be included in one column each (e.g., grade, race, sex, test).
 
-Hint: the names_sep argument in pivot_longer() is very helpful here!
 
 ```{r}
 schools_clean <- schools_clean %>%
@@ -73,8 +69,6 @@ schools_clean <- schools_clean %>%
 
 
 
-## Regional Classification
-Similar to the midterm exam, create a regional grouping for the states. As this will be presented in a written report, be mindful about how you classify the regions. You will need to convince me why you believe these different regions would have different relationships between school expenditures and student test scores.
 
 ```{r, message = FALSE, warning = FALSE, include = FALSE}
 # creating a data frame called regions which contains each State included in the min_wage dataset and its corresponding region 
@@ -92,10 +86,7 @@ schools_clean <-
 ```
 
 
-## Additional Cleaning
-Feel free to clean up the values of these variables! Keep in mind that these are the values that will print to the visualizations you make! For example, maybe you would prefer for the grade variable to only have levels "4" and "8", or maybe you’d prefer test to have levels "Mathematics" and "Reading". I would highly recommend renaming the “A” level of sex to say "all"!
 
-You should also consider what variables you want to be factors, and if there are specific orderings that you would like for them to be displayed in for your visualizations!
 
 ```{r}
 
@@ -129,8 +120,8 @@ schools_model <- schools_clean %>%
   filter(!is.na(INSTRUCTION_EXPENDITURE)) %>% 
   filter(!is.na(YEAR))
 ```
-# Data Visualization
-Create at least three different visualizations exploring the following:
+
+# Data Visualizations
 
 ## Figure 1
 
@@ -195,22 +186,26 @@ Figure 3 shows how the relationship between instructional expenditures and test 
 ## Figure 4
 
 ```{r}
-schools_clean %>%
-  ggplot(aes(x= SEX, y = TEST_SCORES, color = SEX)) + 
-  geom_boxplot() + labs(
-    y= "Test Score", title = "Distribution of Test Scores by Sex"
-    ) + 
-  geom_jitter(alpha = 0.2) +
-  scale_colour_manual(values = c("Dark Green", "Pink", "Light Blue")) + 
-  theme(
-    plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    panel.grid.major = element_blank(),
-    axis.title.x = element_blank(),
-    legend.position = "none"
-    ) +
-  annotate("text", x = 3, y = 177, label = "Male") + annotate("text", x = 2, y = 180, label = "Female") + annotate("text", x = 1, y = 170, label = "All") + facet_wrap(~TEST)
+p <- schools_clean %>%
+  filter(!is.na(TEST_SCORES)) %>%
+  filter(!is.na(INSTRUCTION_EXPENDITURE)) %>%
+  filter(!is.na(YEAR)) %>%
+  ggplot(aes(y = TEST_SCORES, x = Region)) + 
+  geom_boxplot(aes(fill = Region, alpha = .6), show.legend = FALSE) +
+  scale_fill_brewer() +
+  geom_jitter(alpha = 0.7, cex = .4, color = "red") +
+  transition_states(as.integer(YEAR),transition_length = 2, state_length = 1 ) +
+  enter_fade() + 
+  exit_shrink() +
+  ease_aes('sine-in-out') +
+  labs(title = "How US Test Scores Change Over Time, Regionally", subtitle = 'Year: {frame_time}', x = "", y = "Test Scores") + 
+  theme(text = element_text(size=20)) +
+  transition_time(as.integer(YEAR)) 
+
+p
+  
+animate(p, fps = 10, width = 750, height = 450)
+anim_save("plot2.gif")
 
 ```
 
@@ -228,6 +223,7 @@ expend_math <- schools_clean %>% filter(TEST == "MATHEMATICS") %>% lm(TEST_SCORE
 
 expend_reading <- schools_clean %>% filter(TEST == "READING") %>% lm(TEST_SCORES ~ INSTRUCTION_EXPENDITURE, data = .)
 
+rsq <- c()
 
 ```
 
@@ -238,13 +234,13 @@ For which test does instructional expenditures account for a larger proportion o
 
 ### Relationship between instructional expenditures and *mathematics* test scores 
 ```{r MathReg}
-summary(expend_math)
+rsq <- append(rsq, (summary(expend_math) %>% glance() %>% select(r.squared) ))
 ```
 
 ### Relationship between instructional expenditures and *reading* test scores 
 
 ```{r ReadingReg}
-summary(expend_reading)
+rsq <- append(rsq, summary(expend_reading) %>% glance() %>% select(r.squared) )
 ```
 
 
@@ -252,22 +248,22 @@ summary(expend_reading)
 ## Multiple Linear Regression
 ### Both Tests
 
-To account for the test, instead of creating two separate models, we incorporated the **test** variable as a categorical predictor in the equation. We also believed that the **year** of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
+To account for the test, instead of creating two separate models, we incorporated the *test* variable as a categorical predictor in the equation. We also believed that the *year* of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States, which has increased over the years. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
 
 ```{r MLR}
-schools_clean  %>% 
+rsq <- append(rsq, schools_clean  %>% 
   lm(
     TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST, data = .
     ) %>% 
-  summary()
+  summary() %>% glance() %>% select(r.squared))
 ```
 
-To account for the test, instead of creating two separate models, we incorporated the **test** variable as a categorical predictor in the equation. We also believed that the **year** of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
+To account for the test, instead of creating two separate models, we incorporated the *test* variable as a categorical predictor in the equation. We also believed that the *year* of the observation would be important, since we imagined that expenditure would increase in tandem with inflation and the overall standard of living in the United States. After adding these two variables into our model, our R-squared had increased to 0.1569, or 15.69% of variability in the test scores accounted for. Better, but still not ideal.
 
 ```{r}
-schools_clean  %>% mutate(YEAR = as.numeric(YEAR)) %>% 
+rsq <- append(rsq, schools_clean  %>% mutate(YEAR = as.numeric(YEAR)) %>% 
   lm(TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST + YEAR  , data = .) %>%
-  summary()
+  summary() %>% glance() %>% select(r.squared))
 ```
 ## Adjusting for Complexity
 There is a trade off between model “complexity” and an increase in a model’s R2. Unfortunately, even if a variable doesn’t add much to the model, the R2 for that model will still increase. So, we need a different measure that can account for whether the variable(s) explain components of the variability in test scores that weren’t accounted for by other variables.
@@ -276,18 +272,28 @@ This is where adjusted R2 comes in. By “adjusting” the R2, we are essentiall
 
 Include additional variables in your regression and see how much variability in test scores your model can account for. Use adjusted R2 to decide on what final model your group believes is the “best.”
 
-Again, we decided to add some seemingly relavent variables to our model to see if it improved our R-squared. One of the variables was **GRADE** because we had a hypothesis that the grade in which the student in presumably affects their tests score. More specifically, we thought that a higher grade would result in a higher test score, since the student would have more knowledge and therefore more capable of achieving a better score. The other variable we accounted for is **Region**. Different regions most likely spend different amounts of money on education, so we wanted to have that reflected in our model. Also by including regions, we could potentially see which regions were scoring lower or higher on the tests, and see if there was any correlation between the region and the test score. After adding these two variables (**GRADE** and **Region**), our R-squared was now 0.8464, meaning that almost 85% of the variability in the observed test scores was being accounted for by the explanatory variables we included in our model. This is much better, and now some deductions could be made.
+Again, we decided to add some seemingly relavent variables to our model to see if it improved our R-squared. One of the variables was *GRADE* because we had a hypothesis that the grade in which the student in presumably affects their tests score. More specifically, we thought that a higher grade would result in a higher test score, since the student would have more knowledge and therefore more capable of achieving a better score. The other variable we accounted for is *Region*. Different regions most likely spend different amounts of money on education, so we wanted to have that reflected in our model. Also by including regions, we could potentially see which regions were scoring lower or higher on the tests, and see if there was any correlation between the region and the test score. After adding these two variables (*GRADE* and *Region*), our R-squared was now 0.8464, meaning that almost 85% of the variability in the observed test scores was being accounted for by the explanatory variables we included in our model. This is much better, and now some deductions could be made.
 ```{r}
 final_model <- schools_clean  %>% 
   mutate(YEAR = as.numeric(YEAR)) %>% 
   lm(
     TEST_SCORES ~ INSTRUCTION_EXPENDITURE + TEST + YEAR + GRADE + Region , data = .
     )
-summary(final_model)
+rsq <- append(rsq, summary(final_model) %>% glance() %>% select(r.squared))
 ```
 
 With your final model, make a visualization that explores the relationships accounted for in your model.
 
+```{r}
+RSquared <- unlist(rsq)
+Y_Variable <- c("Test Score", "Test Score", "Test Score", "Test Score", "Test Score")
+X_Variable <- c("Ed. Expenditure (Math)", "Ed. Expenditure (Reading)", "Ed. Expenditure, Test", "Ed. Expenditure, Test, Year", "Ed. Expenditure, Test, Year, Grade, Region")
+rsq_models <- data.frame(RSquared, Y_Variable, X_Variable)
+```
+
+```{r}
+rsq_models
+```
 
 
 ```{r}
@@ -358,6 +364,7 @@ obs_plot  <- schools_model %>%
 animate(obs_plot + scale_colour_brewer(palette = "Set2"))
 ```
 
+We performed a predictive check for our chosen linear model to see if the assumed linear model accurately describes the observed data. We created a visualization that shows the distribution of test scores and instructional expenditures for both predicted and observed values. In general, these two models are pretty similar with very few noticeable differences. From 2011-2015, it seemed that observed values had test scores higher than predicted values for reading. In addition, for 1992, 2000, and 2002, it seemed that predicted values had more data with lower instructional expenditures equally distributed between test scores than observed values. Overall, predicted values didn’t seem to be drastically different from observed values. 
 
 ```{r}
 pred_plot  <- schools_model %>% 
@@ -410,3 +417,4 @@ sim_r_sq <- as.data.frame(sim_r_sq)
 sim_r_sq %>% ggplot(aes(sim_r_sq)) + geom_histogram(color = "green", fill = "dark blue") + xlim(0.7, 0.73) + labs(x = "Simulated R-squared", y = "Count")
 ```
 
+Finally, we generated 1000 simulated datasets, regressed the observed dataset against each simulated dataset, and kept the r^2 from the regression. We then plotted the distribution of the r^2 values from the regression. In the plot, we noticed that the r^2 values from the simulated dataset ranged from 0.707 to 0.73. With this range, we can conclude that the data we simulated under our statistical model is strongly similar to the observed values. This means that our statistical model does not account for about 28% of the observed variability in the observed test scores. 
